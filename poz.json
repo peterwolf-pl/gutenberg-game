@@ -1,0 +1,378 @@
+[
+  {
+    "char": "a",
+    "x1": 727,
+    "y1": 1202,
+    "x2": 902,
+    "y2": 1437,
+    "img": "/assets/letters/a.png"
+  },
+  {
+    "char": "ą",
+    "x1": 907,
+    "y1": 300,
+    "x2": 998,
+    "y2": 381,
+    "img": "/assets/letters/ą.png"
+  },
+  {
+    "char": "b",
+    "x1": 613,
+    "y1": 302,
+    "x2": 709,
+    "y2": 379,
+    "img": "/assets/letters/b.png"
+  },
+  {
+    "char": "c",
+    "x1": 979,
+    "y1": 729,
+    "x2": 1087,
+    "y2": 951,
+    "img": "/assets/letters/c.png"
+  },
+  {
+    "char": "ć",
+    "x1": 358,
+    "y1": 864,
+    "x2": 408,
+    "y2": 942,
+    "img": "/assets/letters/ć.png"
+  },
+  {
+    "char": "d",
+    "x1": 1341,
+    "y1": 734,
+    "x2": 1455,
+    "y2": 956,
+    "img": "/assets/letters/d.png"
+  },
+  {
+    "char": "e",
+    "x1": 910,
+    "y1": 1207,
+    "x2": 1082,
+    "y2": 1442,
+    "img": "/assets/letters/e.png"
+  },
+  {
+    "char": "ę",
+    "x1": 1007,
+    "y1": 301,
+    "x2": 1096,
+    "y2": 380,
+    "img": "/assets/letters/ę.png"
+  },
+  {
+    "char": "f",
+    "x1": 292,
+    "y1": 675,
+    "x2": 347,
+    "y2": 752,
+    "img": "/assets/letters/f.png"
+  },
+  {
+    "char": "g",
+    "x1": 511,
+    "y1": 302,
+    "x2": 604,
+    "y2": 376,
+    "img": "/assets/letters/g.png"
+  },
+  {
+    "char": "h",
+    "x1": 613,
+    "y1": 207,
+    "x2": 708,
+    "y2": 282,
+    "img": "/assets/letters/h.png"
+  },
+  {
+    "char": "i",
+    "x1": 1095,
+    "y1": 961,
+    "x2": 1267,
+    "y2": 1196,
+    "img": "/assets/letters/i.png"
+  },
+  {
+    "char": "k",
+    "x1": 279,
+    "y1": 412,
+    "x2": 345,
+    "y2": 444,
+    "img": "/assets/letters/k.png"
+  },
+  {
+    "char": "l",
+    "x1": 284,
+    "y1": 364,
+    "x2": 360,
+    "y2": 414,
+    "img": "/assets/letters/l.png"
+  },
+  {
+    "char": "ł",
+    "x1": 249,
+    "y1": 298,
+    "x2": 327,
+    "y2": 350,
+    "img": "/assets/letters/ł.png"
+  },
+  {
+    "char": "m",
+    "x1": 727,
+    "y1": 727,
+    "x2": 846,
+    "y2": 961,
+    "img": "/assets/letters/m.png"
+  },
+  {
+    "char": "n",
+    "x1": 727,
+    "y1": 961,
+    "x2": 905,
+    "y2": 1199,
+    "img": "/assets/letters/n.png"
+  },
+  {
+    "char": "ń",
+    "x1": 179,
+    "y1": 358,
+    "x2": 232,
+    "y2": 391,
+    "img": "/assets/letters/ń.png"
+  },
+  {
+    "char": "o",
+    "x1": 1095,
+    "y1": 1202,
+    "x2": 1267,
+    "y2": 1431,
+    "img": "/assets/letters/o.png"
+  },
+  {
+    "char": "ó",
+    "x1": 354,
+    "y1": 582,
+    "x2": 407,
+    "y2": 660,
+    "img": "/assets/letters/ó.png"
+  },
+  {
+    "char": "p",
+    "x1": 355,
+    "y1": 583,
+    "x2": 412,
+    "y2": 662,
+    "img": "/assets/letters/p.png"
+  },
+  {
+    "char": "q",
+    "x1": 807,
+    "y1": 395,
+    "x2": 896,
+    "y2": 567,
+    "img": "/assets/letters/q.png"
+  },
+  {
+    "char": "r",
+    "x1": 1095,
+    "y1": 734,
+    "x2": 1209,
+    "y2": 956,
+    "img": "/assets/letters/r.png"
+  },
+  {
+    "char": "s",
+    "x1": 854,
+    "y1": 727,
+    "x2": 971,
+    "y2": 956,
+    "img": "/assets/letters/s.png"
+  },
+  {
+    "char": "ś",
+    "x1": 426,
+    "y1": 584,
+    "x2": 475,
+    "y2": 750,
+    "img": "/assets/letters/ś.png"
+  },
+  {
+    "char": "t",
+    "x1": 427,
+    "y1": 582,
+    "x2": 479,
+    "y2": 752,
+    "img": "/assets/letters/t.png"
+  },
+  {
+    "char": "u",
+    "x1": 427,
+    "y1": 770,
+    "x2": 475,
+    "y2": 948,
+    "img": "/assets/letters/u.png"
+  },
+  {
+    "char": "v",
+    "x1": 220,
+    "y1": 648,
+    "x2": 248,
+    "y2": 667,
+    "img": "/assets/letters/v.png"
+  },
+  {
+    "char": "w",
+    "x1": 1272,
+    "y1": 964,
+    "x2": 1458,
+    "y2": 1196,
+    "img": "/assets/letters/w.png"
+  },
+  {
+    "char": "x",
+    "x1": 261,
+    "y1": 759,
+    "x2": 306,
+    "y2": 777,
+    "img": "/assets/letters/x.png"
+  },
+  {
+    "char": "y",
+    "x1": 1214,
+    "y1": 732,
+    "x2": 1328,
+    "y2": 959,
+    "img": "/assets/letters/y.png"
+  },
+  {
+    "char": "z",
+    "x1": 910,
+    "y1": 956,
+    "x2": 1085,
+    "y2": 1199,
+    "img": "/assets/letters/z.png"
+  },
+  {
+    "char": "ź",
+    "x1": 221,
+    "y1": 804,
+    "x2": 263,
+    "y2": 819,
+    "img": "/assets/letters/ź.png"
+  },
+  {
+    "char": "ż",
+    "x1": 285,
+    "y1": 812,
+    "x2": 318,
+    "y2": 831,
+    "img": "/assets/letters/ż.png"
+  },
+  {
+    "char": "1",
+    "x1": 92,
+    "y1": 676,
+    "x2": 150,
+    "y2": 751,
+    "img": "/assets/letters/1.png"
+  },
+  {
+    "char": "2",
+    "x1": 164,
+    "y1": 675,
+    "x2": 216,
+    "y2": 753,
+    "img": "/assets/letters/2.png"
+  },
+  {
+    "char": "3",
+    "x1": 230,
+    "y1": 678,
+    "x2": 279,
+    "y2": 751,
+    "img": "/assets/letters/3.png"
+  },
+  {
+    "char": "4",
+    "x1": 93,
+    "y1": 775,
+    "x2": 150,
+    "y2": 845,
+    "img": "/assets/letters/4.png"
+  },
+  {
+    "char": "5",
+    "x1": 159,
+    "y1": 768,
+    "x2": 217,
+    "y2": 847,
+    "img": "/assets/letters/5.png"
+  },
+  {
+    "char": "6",
+    "x1": 229,
+    "y1": 768,
+    "x2": 281,
+    "y2": 846,
+    "img": "/assets/letters/6.png"
+  },
+  {
+    "char": "7",
+    "x1": 91,
+    "y1": 865,
+    "x2": 151,
+    "y2": 944,
+    "img": "/assets/letters/7.png"
+  },
+  {
+    "char": "8",
+    "x1": 165,
+    "y1": 865,
+    "x2": 216,
+    "y2": 944,
+    "img": "/assets/letters/8.png"
+  },
+  {
+    "char": "9",
+    "x1": 230,
+    "y1": 868,
+    "x2": 281,
+    "y2": 943,
+    "img": "/assets/letters/9.png"
+  },
+  {
+    "char": "0",
+    "x1": 293,
+    "y1": 866,
+    "x2": 345,
+    "y2": 945,
+    "img": "/assets/letters/0.png"
+  },
+  {
+    "char": ".",
+    "x1": 1125,
+    "y1": 773,
+    "x2": 1184,
+    "y2": 851,
+    "img": "/assets/letters/kom.png"
+  },
+  {
+    "char": ",",
+    "x1": 1192,
+    "y1": 774,
+    "x2": 1245,
+    "y2": 847,
+    "img": "/assets/letters/sep.png"
+  },
+  {
+    "char": "spacja",
+    "x1": 1280,
+    "y1": 1204,
+    "x2": 1450,
+    "y2": 1434,
+    "img": "/assets/letters/spacja.png"
+  }
+]
