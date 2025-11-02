@@ -171,9 +171,8 @@ export default function PrintModule({ lines = [], onBack }) {
 
     const rightPageEl = rightPageRef.current;
     const renderedWidthPx = rightPageEl?.getBoundingClientRect().width || pageW;
-    const renderedHeightPx = rightPageEl?.getBoundingClientRect().height || pageH;
     const baseWidthPx = scale > 0 ? renderedWidthPx / scale : A4_WIDTH;
-    const baseHeightPx = scale > 0 ? renderedHeightPx / scale : A4_HEIGHT;
+    const baseHeightPx = A4_HEIGHT;
     const pageWidthMm = toMm(baseWidthPx);
     const pageHeightMm = toMm(baseHeightPx);
 
@@ -270,6 +269,7 @@ export default function PrintModule({ lines = [], onBack }) {
         padding-left: ${paddingLeftMm}mm;
         background: #fff;
         box-shadow: 0 6px 48px #0003;
+        overflow: hidden;
       }
       .line {
         display: flex;
