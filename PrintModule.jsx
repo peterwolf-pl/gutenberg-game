@@ -76,6 +76,7 @@ export default function PrintModule({ lines = [], onBack }) {
   const [rightPageShown, setRightPageShown] = useState(false);
   const [activeEgg, setActiveEgg] = useState(null);
   const triggeredEggsRef = useRef(new Set());
+  const rightPageRef = useRef(null);
 
   const safeLines = useMemo(
     () => (Array.isArray(lines) ? lines : []),
@@ -168,6 +169,14 @@ export default function PrintModule({ lines = [], onBack }) {
     const paddingLeftMm = toMm(60);
     const marginBottomMm = toMm(12);
 
+    const rightPageEl = rightPageRef.current;
+    const renderedWidthPx = rightPageEl?.getBoundingClientRect().width || pageW;
+    const renderedHeightPx = rightPageEl?.getBoundingClientRect().height || pageH;
+    const baseWidthPx = scale > 0 ? renderedWidthPx / scale : A4_WIDTH;
+    const baseHeightPx = scale > 0 ? renderedHeightPx / scale : A4_HEIGHT;
+    const pageWidthMm = toMm(baseWidthPx);
+    const pageHeightMm = toMm(baseHeightPx);
+
     const printWindow = window.open("", "_blank", "width=900,height=650");
     if (!printWindow) {
       console.warn("[PrintModule] Nie udało się otworzyć okna drukowania.");
@@ -242,16 +251,16 @@ export default function PrintModule({ lines = [], onBack }) {
         font-family: sans-serif;
       }
       .page-wrapper {
-        width: 210mm;
-        height: 297mm;
+        width: ${pageWidthMm}mm;
+        height: ${pageHeightMm}mm;
         display: flex;
         align-items: center;
         justify-content: center;
         background: transparent;
       }
       .page {
-        width: 210mm;
-        height: 297mm;
+        width: ${pageWidthMm}mm;
+        height: ${pageHeightMm}mm;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -478,6 +487,7 @@ export default function PrintModule({ lines = [], onBack }) {
               transformStyle: "preserve-3d",
               backfaceVisibility: "hidden"
             }}
+            ref={rightPageRef}
           >
             <div
               style={{
