@@ -6,12 +6,12 @@ const KASZTA_VARIANTS = {
   kaszta: {
     label: "Kaszta podstawowa",
     image: "/assets/kaszta.png",
-    poz: "/poz.json",
+    pozSrc: "/poz.json",
   },
   szuflada: {
     label: "Szuflada",
     image: "/assets/kaszta_szuflada.png",
-    poz: "/poz_szuflada.json",
+    pozSrc: "/poz_szuflada.json",
   },
 };
 
@@ -163,7 +163,7 @@ function App() {
           ) : (
             <LetterFieldEditor
               kasztaImage={kasztaConfig.image}
-              pozSrc={kasztaConfig.poz}
+              pozSrc={kasztaConfig.pozSrc}
             />
           )}
         </div>
