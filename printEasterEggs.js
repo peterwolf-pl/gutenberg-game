@@ -24,9 +24,15 @@ const printEasterEggs = [
     description: "Klip wideo przedstawiający zadrukowywany arkusz papieru.",
   },
   {
-    word: "wolf",
+    word: "muzeum",
     type: "youtube",
     src: "https://youtu.be/4X3jg67-6bI?si=lhR6qVmRusCJ31Yt",
+    description: "Materiał wideo o tradycyjnej czcionce ruchomej.",
+  },
+    {
+    word: "wolf",
+    type: "youtube",
+    src: "https://youtu.be/F9e1YqeAxss?si=prUykQmyqOyu2Ne3",
     description: "Materiał wideo o tradycyjnej czcionce ruchomej.",
   },
 ];

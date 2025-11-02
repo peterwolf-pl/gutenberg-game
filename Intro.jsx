@@ -39,6 +39,12 @@ export default function Intro({ onSelect, onAdmin }) {
       >
         ZECER
       </h1>
+      <p align="right"style={{
+          fontFamily: "GrohmanGrotesk-Classic",
+          fontSize: "1.66rem",
+          color: "#ff0000",
+          marginTop: "-25px",
+        }}> by peterwolf.pl</p>
       <h2
         style={{
           fontFamily: "GrohmanGrotesk-Classic",
@@ -83,9 +89,12 @@ export default function Intro({ onSelect, onAdmin }) {
         }}
       >Czcionka Brygada 1918</h4>
         
-    </div>
- 
+
    
-  );
+
+     
+     </div>
+    
+   );
 }
 

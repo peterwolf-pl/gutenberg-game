@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import easterEggs from "./printEasterEggs";
 
 const A4_WIDTH = 796;
@@ -68,6 +68,71 @@ export default function PrintModule({ lines = [], onBack }) {
   const [rightPageShown, setRightPageShown] = useState(false);
   const [activeEgg, setActiveEgg] = useState(null);
   const triggeredEggsRef = useRef(new Set());
+  const rightPageRef = useRef(null);
+  const html2CanvasLoaderRef = useRef(null);
+  const cleanupPrintIframeRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (cleanupPrintIframeRef.current) {
+        cleanupPrintIframeRef.current();
+        cleanupPrintIframeRef.current = null;
+      }
+    };
+  }, []);
+
+  const loadHtml2Canvas = useCallback(() => {
+    if (typeof window === "undefined") {
+      return Promise.resolve(null);
+    }
+
+    if (window.html2canvas) {
+      return Promise.resolve(window.html2canvas);
+    }
+
+    if (!html2CanvasLoaderRef.current) {
+      html2CanvasLoaderRef.current = new Promise((resolve, reject) => {
+        const scriptId = "html2canvas-script";
+        let script = document.getElementById(scriptId);
+
+        const cleanup = () => {
+          if (!script) {
+            return;
+          }
+          script.removeEventListener("load", handleLoad);
+          script.removeEventListener("error", handleError);
+        };
+
+        const handleLoad = () => {
+          cleanup();
+          resolve(window.html2canvas);
+        };
+
+        const handleError = (event) => {
+          cleanup();
+          html2CanvasLoaderRef.current = null;
+          reject(event?.error || new Error("Nie udało się wczytać html2canvas"));
+        };
+
+        if (!script) {
+          script = document.createElement("script");
+          script.id = scriptId;
+          script.src =
+            "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+          script.async = true;
+          script.crossOrigin = "anonymous";
+          script.addEventListener("load", handleLoad);
+          script.addEventListener("error", handleError);
+          document.head.appendChild(script);
+        } else {
+          script.addEventListener("load", handleLoad);
+          script.addEventListener("error", handleError);
+        }
+      });
+    }
+
+    return html2CanvasLoaderRef.current;
+  }, []);
 
   const safeLines = useMemo(
     () => (Array.isArray(lines) ? lines : []),
@@ -153,6 +218,236 @@ export default function PrintModule({ lines = [], onBack }) {
       }),
     [safeLines]
   );
+
+  const handlePrintRightPage = useCallback(async () => {
+    const rightPageEl = rightPageRef.current;
+
+    if (!rightPageEl) {
+      console.warn("[PrintModule] Nie znaleziono prawej strony do wydruku.");
+      return;
+    }
+
+    try {
+      if (cleanupPrintIframeRef.current) {
+        cleanupPrintIframeRef.current();
+        cleanupPrintIframeRef.current = null;
+      }
+
+      const html2canvas = await loadHtml2Canvas();
+
+      if (!html2canvas) {
+        throw new Error("Brak biblioteki html2canvas");
+      }
+
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (err) {
+          console.warn("[PrintModule] Nie udało się odczytać stanu czcionek", err);
+        }
+      }
+
+      const previousTransform = rightPageEl.style.transform;
+      const previousAnimation = rightPageEl.style.animation;
+      const previousTransition = rightPageEl.style.transition;
+
+      let canvas;
+      try {
+        rightPageEl.style.transform = "none";
+        rightPageEl.style.animation = "none";
+        rightPageEl.style.transition = "none";
+
+        canvas = await html2canvas(rightPageEl, {
+          backgroundColor: "#ffffff",
+          scale: Math.max(window.devicePixelRatio || 1, 2),
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+        });
+      } finally {
+        rightPageEl.style.transform = previousTransform;
+        rightPageEl.style.animation = previousAnimation;
+        rightPageEl.style.transition = previousTransition;
+      }
+
+      if (!canvas) {
+        throw new Error("Nie udało się wykonać zrzutu ekranu");
+      }
+
+      const blob = await new Promise((resolve, reject) => {
+        if (!canvas.toBlob) {
+          try {
+            const url = canvas.toDataURL("image/png", 1);
+            if (!url || url === "data:,") {
+              reject(new Error("Pusty zrzut ekranu"));
+              return;
+            }
+            resolve(url);
+          } catch (err) {
+            reject(err);
+          }
+          return;
+        }
+        canvas.toBlob(
+          (result) => {
+            if (!result) {
+              reject(new Error("Nie udało się utworzyć obrazu"));
+              return;
+            }
+            resolve(result);
+          },
+          "image/png",
+          1
+        );
+      });
+
+      const objectUrl =
+        typeof blob === "string" ? blob : URL.createObjectURL(blob);
+
+      const printHtml = `<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charSet="utf-8" />
+    <title>Drukuj skład</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #10131a;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .sheet {
+        width: 210mm;
+        height: 297mm;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      img {
+        width: 210mm;
+        height: auto;
+        max-height: 297mm;
+        display: block;
+      }
+      @media print {
+        body {
+          background: #ffffff;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <img id="print-image" src="${objectUrl}" alt="Podgląd prawej strony" />
+    </div>
+    <script>
+      (function() {
+        const finish = () => {
+          window.removeEventListener('message', handleParentMessage);
+          try {
+            parent.postMessage({ type: 'print-module-right-page-finished' }, '*');
+          } catch (_) {}
+        };
+
+        function triggerPrint() {
+          window.focus();
+          window.print();
+        }
+
+        function handleParentMessage(event) {
+          if (!event || !event.data) {
+            return;
+          }
+          if (event.data.type === 'print-module-right-page-abort') {
+            finish();
+          }
+        }
+
+        window.addEventListener('message', handleParentMessage);
+
+        const img = document.getElementById('print-image');
+        const startPrint = () => {
+          setTimeout(triggerPrint, 50);
+        };
+
+        if (img.complete) {
+          startPrint();
+        } else {
+          img.addEventListener('load', startPrint, { once: true });
+          img.addEventListener('error', startPrint, { once: true });
+        }
+
+        window.addEventListener('afterprint', () => {
+          finish();
+        });
+      })();
+    </scr` + `ipt>
+  </body>
+</html>`;
+
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+      iframe.setAttribute("aria-hidden", "true");
+
+      const cleanup = () => {
+        if (cleanupPrintIframeRef.current === cleanup) {
+          cleanupPrintIframeRef.current = null;
+        }
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+        if (typeof blob !== "string") {
+          URL.revokeObjectURL(objectUrl);
+        }
+        window.removeEventListener("message", handleMessage);
+      };
+
+      const handleMessage = (event) => {
+        if (!event || !event.source || event.source !== iframe.contentWindow) {
+          return;
+        }
+        if (!event.data) {
+          return;
+        }
+        if (event.data.type === "print-module-right-page-finished") {
+          cleanup();
+        }
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      cleanupPrintIframeRef.current = cleanup;
+      document.body.appendChild(iframe);
+      iframe.srcdoc = printHtml;
+    } catch (error) {
+      console.error("[PrintModule] Nie udało się przygotować wydruku:", error);
+      if (cleanupPrintIframeRef.current) {
+        cleanupPrintIframeRef.current();
+        cleanupPrintIframeRef.current = null;
+      }
+    }
+  }, [loadHtml2Canvas]);
 
   return (
     <div
@@ -300,6 +595,7 @@ export default function PrintModule({ lines = [], onBack }) {
               transformStyle: "preserve-3d",
               backfaceVisibility: "hidden"
             }}
+            ref={rightPageRef}
           >
             <div
               style={{
@@ -358,8 +654,32 @@ export default function PrintModule({ lines = [], onBack }) {
             zIndex: 10,
             display: "flex",
             flexDirection: "column",
+            gap: 10,
           }}
         >
+          <button
+            onClick={handlePrintRightPage}
+            style={{
+              background: "#222",
+              color: "#fff",
+              border: "2px solid #888",
+              borderRadius: "10%",
+              width: 39,
+              height: 39,
+              fontSize: 20,
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "2px 2px 8px #0002",
+              outline: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title="Drukuj prawą stronę"
+            aria-label="Drukuj prawą stronę"
+          >
+            🖨️
+          </button>
           <button
             onClick={onBack}
             style={{
@@ -381,15 +701,15 @@ export default function PrintModule({ lines = [], onBack }) {
             title="Powrót"
             aria-label="Powrót"
           >
-          <span
-            style={{
-              display: "inline-block",
-              transform: "rotate(180deg) translateY(2px)",
-              fontFamily: "Arial, sans-serif",
-            }}
-          >
-            &#8594;
-          </span>
+            <span
+              style={{
+                display: "inline-block",
+                transform: "rotate(180deg) translateY(2px)",
+                fontFamily: "Arial, sans-serif",
+              }}
+            >
+              &#8594;
+            </span>
           </button>
         </div>
       </div>
