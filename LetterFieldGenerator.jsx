@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 
 const KASZTA_WIDTH = 2222;
 const KASZTA_HEIGHT = 1521;
@@ -296,24 +302,117 @@ export default function LetterFieldEditor({
     event.preventDefault();
   }
 
+  const hasWindow = typeof window !== "undefined";
+
+  function getFilenameFromPath(path) {
+    if (!path) return "pozycje.json";
+    try {
+      const base = hasWindow ? window.location.href : "http://localhost";
+      const url = new URL(path, base);
+      return url.pathname.split("/").filter(Boolean).pop() || "pozycje.json";
+    } catch {
+      const segments = path.split("/").filter(Boolean);
+      return segments.pop() || "pozycje.json";
+    }
+  }
+
+  async function trySaveWithFilePicker(json, suggestedName) {
+    if (!hasWindow || !window.showSaveFilePicker) {
+      throw new Error("Przeglądarka nie wspiera natywnego wyboru pliku.");
+    }
+
+    const fileHandle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [
+        {
+          description: "Pliki JSON",
+          accept: { "application/json": [".json"] },
+        },
+      ],
+    });
+
+    const writable = await fileHandle.createWritable();
+    await writable.write(json);
+    await writable.close();
+  }
+
+  function downloadJson(json, filename) {
+    if (!hasWindow) {
+      throw new Error("Brak możliwości pobrania pliku w tym środowisku.");
+    }
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   async function handleSaveToJson() {
     setIsSaving(true);
     setSaveStatus(null);
+    if (!hasWindow) {
+      setSaveStatus({
+        type: "error",
+        message: "Zapisywanie dostępne jest tylko z poziomu przeglądarki.",
+      });
+      setIsSaving(false);
+      return;
+    }
+    const json = JSON.stringify(fields, null, 2);
+    const fallbackName = getFilenameFromPath(pozSrc);
+
     try {
       const response = await fetch(pozSrc, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(fields, null, 2),
+        body: json,
       });
+
       if (!response.ok) {
-        throw new Error(`Błąd zapisu: ${response.status}`);
+        const error = new Error(`Błąd zapisu: ${response.status}`);
+        error.status = response.status;
+        throw error;
       }
+
       setSaveStatus({ type: "success", message: "Zmiany zapisane pomyślnie." });
     } catch (err) {
-      const message = err?.message || "Nie udało się zapisać pliku.";
-      setSaveStatus({ type: "error", message });
+      if (err?.status === 501 || err?.status === 405) {
+        try {
+          if (hasWindow && window.isSecureContext && window.showSaveFilePicker) {
+            await trySaveWithFilePicker(json, fallbackName);
+            setSaveStatus({
+              type: "info",
+              message:
+                "Serwer nie wspiera zapisu. Plik został zapisany lokalnie – zamień nim oryginalny JSON.",
+            });
+          } else if (hasWindow) {
+            downloadJson(json, fallbackName);
+            setSaveStatus({
+              type: "info",
+              message:
+                "Serwer nie wspiera zapisu. Pobrano plik JSON – podmień nim oryginalny plik.",
+            });
+          } else {
+            throw new Error(
+              "Serwer nie wspiera zapisu, a środowisko nie pozwala na pobranie pliku."
+            );
+          }
+        } catch (downloadError) {
+          const message =
+            downloadError?.message ||
+            "Serwer nie wspiera zapisu, a automatyczne pobranie nie powiodło się.";
+          setSaveStatus({ type: "error", message });
+        }
+      } else {
+        const message = err?.message || "Nie udało się zapisać pliku.";
+        setSaveStatus({ type: "error", message });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -610,7 +709,12 @@ export default function LetterFieldEditor({
           {saveStatus && (
             <span
               style={{
-                color: saveStatus.type === "success" ? "#15803d" : "#dc2626",
+                color:
+                  saveStatus.type === "success"
+                    ? "#15803d"
+                    : saveStatus.type === "info"
+                    ? "#0369a1"
+                    : "#dc2626",
                 fontSize: 14,
                 fontWeight: 500,
               }}
