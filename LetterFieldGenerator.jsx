@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 const KASZTA_WIDTH = 2222;
 const KASZTA_HEIGHT = 1521;
@@ -13,6 +13,13 @@ function ensureNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function clamp(value, min, max) {
+  if (max < min) {
+    return min;
+  }
+  return Math.min(Math.max(value, min), max);
+}
+
 export default function LetterFieldEditor({
   kasztaImage = "/assets/kaszta.png",
   pozSrc = "/poz_szuflada.json",
@@ -23,11 +30,15 @@ export default function LetterFieldEditor({
   const [clicks, setClicks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
   const [displaySize, setDisplaySize] = useState({
     width: KASZTA_WIDTH,
     height: KASZTA_HEIGHT,
   });
   const kasztaRef = useRef(null);
+  const draggingRef = useRef(null);
 
   useEffect(() => {
     let ignore = false;
@@ -179,6 +190,135 @@ export default function LetterFieldEditor({
     updateSelectedField({ img: path });
   }
 
+  const handlePointerMove = useCallback(event => {
+    const info = draggingRef.current;
+    if (!info || !kasztaRef.current) {
+      return;
+    }
+
+    const rect = kasztaRef.current.getBoundingClientRect();
+    const scaleX = KASZTA_WIDTH / rect.width;
+    const scaleY = KASZTA_HEIGHT / rect.height;
+    const pointerX = (event.clientX - rect.left) * scaleX;
+    const pointerY = (event.clientY - rect.top) * scaleY;
+
+    let nextLeft = pointerX - info.pointerOffsetX;
+    let nextTop = pointerY - info.pointerOffsetY;
+
+    const maxOffsetX = Math.max(info.offsetsX[0], info.offsetsX[1]);
+    const maxOffsetY = Math.max(info.offsetsY[0], info.offsetsY[1]);
+
+    nextLeft = clamp(nextLeft, 0, KASZTA_WIDTH - maxOffsetX);
+    nextTop = clamp(nextTop, 0, KASZTA_HEIGHT - maxOffsetY);
+
+    const newX1 = Math.round(nextLeft + info.offsetsX[0]);
+    const newX2 = Math.round(nextLeft + info.offsetsX[1]);
+    const newY1 = Math.round(nextTop + info.offsetsY[0]);
+    const newY2 = Math.round(nextTop + info.offsetsY[1]);
+
+    setFields(prev =>
+      prev.map((field, idx) =>
+        idx === info.index
+          ? {
+              ...field,
+              x1: newX1,
+              x2: newX2,
+              y1: newY1,
+              y2: newY2,
+            }
+          : field
+      )
+    );
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    if (!draggingRef.current) {
+      return;
+    }
+    draggingRef.current = null;
+    setDraggingIndex(null);
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", handlePointerUp);
+    window.removeEventListener("pointercancel", handlePointerUp);
+  }, [handlePointerMove]);
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [handlePointerMove, handlePointerUp]);
+
+  function handleFieldPointerDown(event, index) {
+    event.stopPropagation();
+    if (!event.isPrimary || event.button !== 0) {
+      return;
+    }
+    if (!kasztaRef.current) {
+      return;
+    }
+
+    handleFieldSelect(index);
+
+    const field = fields[index];
+    if (!field) {
+      return;
+    }
+
+    const rect = kasztaRef.current.getBoundingClientRect();
+    const scaleX = KASZTA_WIDTH / rect.width;
+    const scaleY = KASZTA_HEIGHT / rect.height;
+    const pointerX = (event.clientX - rect.left) * scaleX;
+    const pointerY = (event.clientY - rect.top) * scaleY;
+
+    const topLeftX = Math.min(field.x1 ?? 0, field.x2 ?? 0);
+    const topLeftY = Math.min(field.y1 ?? 0, field.y2 ?? 0);
+
+    draggingRef.current = {
+      index,
+      pointerOffsetX: pointerX - topLeftX,
+      pointerOffsetY: pointerY - topLeftY,
+      offsetsX: [
+        (field.x1 ?? 0) - topLeftX,
+        (field.x2 ?? 0) - topLeftX,
+      ],
+      offsetsY: [
+        (field.y1 ?? 0) - topLeftY,
+        (field.y2 ?? 0) - topLeftY,
+      ],
+    };
+
+    setDraggingIndex(index);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    event.preventDefault();
+  }
+
+  async function handleSaveToJson() {
+    setIsSaving(true);
+    setSaveStatus(null);
+    try {
+      const response = await fetch(pozSrc, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fields, null, 2),
+      });
+      if (!response.ok) {
+        throw new Error(`Błąd zapisu: ${response.status}`);
+      }
+      setSaveStatus({ type: "success", message: "Zmiany zapisane pomyślnie." });
+    } catch (err) {
+      const message = err?.message || "Nie udało się zapisać pliku.";
+      setSaveStatus({ type: "error", message });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const jsonOutput = useMemo(() => JSON.stringify(fields, null, 2), [fields]);
 
   return (
@@ -236,10 +376,7 @@ export default function LetterFieldEditor({
               return (
                 <div
                   key={`${field.char}-${index}`}
-                  onClick={event => {
-                    event.stopPropagation();
-                    handleFieldSelect(index);
-                  }}
+                  onPointerDown={event => handleFieldPointerDown(event, index)}
                   style={{
                     position: "absolute",
                     left: left,
@@ -251,7 +388,13 @@ export default function LetterFieldEditor({
                       ? "rgba(249, 115, 22, 0.18)"
                       : "rgba(96, 165, 250, 0.16)",
                     boxSizing: "border-box",
-                    cursor: "pointer",
+                    cursor:
+                      isSelected && draggingIndex === index
+                        ? "grabbing"
+                        : isSelected
+                        ? "move"
+                        : "pointer",
+                    userSelect: "none",
                   }}
                 >
                   <span
@@ -442,6 +585,40 @@ export default function LetterFieldEditor({
 
       <div style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: 20, marginBottom: 8 }}>Aktualny JSON</h2>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <button
+            onClick={handleSaveToJson}
+            disabled={isSaving}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "none",
+              background: "#0ea5e9",
+              color: "white",
+              cursor: isSaving ? "wait" : "pointer",
+            }}
+          >
+            {isSaving ? "Zapisywanie…" : "Zapisz zmiany"}
+          </button>
+          {saveStatus && (
+            <span
+              style={{
+                color: saveStatus.type === "success" ? "#15803d" : "#dc2626",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              {saveStatus.message}
+            </span>
+          )}
+        </div>
         <textarea
           readOnly
           value={jsonOutput}
