@@ -28,8 +28,11 @@ const normalizeWord = (word) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 
+const reverseString = (value = "") => value.split("").reverse().join("");
+
 const easterEggMap = easterEggs.reduce((map, egg) => {
-  const key = normalizeWord(egg.word);
+  const normalizedWord = normalizeWord(egg.word);
+  const key = reverseString(normalizedWord);
   if (key && !map.has(key)) {
     map.set(key, egg);
   }
