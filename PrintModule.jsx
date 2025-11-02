@@ -70,6 +70,16 @@ export default function PrintModule({ lines = [], onBack }) {
   const triggeredEggsRef = useRef(new Set());
   const rightPageRef = useRef(null);
   const html2CanvasLoaderRef = useRef(null);
+  const cleanupPrintIframeRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (cleanupPrintIframeRef.current) {
+        cleanupPrintIframeRef.current();
+        cleanupPrintIframeRef.current = null;
+      }
+    };
+  }, []);
 
   const loadHtml2Canvas = useCallback(() => {
     if (typeof window === "undefined") {
@@ -218,29 +228,84 @@ export default function PrintModule({ lines = [], onBack }) {
     }
 
     try {
+      if (cleanupPrintIframeRef.current) {
+        cleanupPrintIframeRef.current();
+        cleanupPrintIframeRef.current = null;
+      }
+
       const html2canvas = await loadHtml2Canvas();
 
       if (!html2canvas) {
         throw new Error("Brak biblioteki html2canvas");
       }
 
-      const canvas = await html2canvas(rightPageEl, {
-        backgroundColor: "#ffffff",
-        scale: window.devicePixelRatio || 1,
-        useCORS: true,
-        scrollX: 0,
-        scrollY: 0,
-      });
-
-      const dataUrl = canvas.toDataURL("image/png");
-
-      const printWindow = window.open("", "_blank", "width=900,height=650");
-      if (!printWindow) {
-        throw new Error("Nie udało się otworzyć okna drukowania");
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (err) {
+          console.warn("[PrintModule] Nie udało się odczytać stanu czcionek", err);
+        }
       }
 
-      const documentHtml = `<!DOCTYPE html>
-<html>
+      const previousTransform = rightPageEl.style.transform;
+      const previousAnimation = rightPageEl.style.animation;
+      const previousTransition = rightPageEl.style.transition;
+
+      let canvas;
+      try {
+        rightPageEl.style.transform = "none";
+        rightPageEl.style.animation = "none";
+        rightPageEl.style.transition = "none";
+
+        canvas = await html2canvas(rightPageEl, {
+          backgroundColor: "#ffffff",
+          scale: Math.max(window.devicePixelRatio || 1, 2),
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+        });
+      } finally {
+        rightPageEl.style.transform = previousTransform;
+        rightPageEl.style.animation = previousAnimation;
+        rightPageEl.style.transition = previousTransition;
+      }
+
+      if (!canvas) {
+        throw new Error("Nie udało się wykonać zrzutu ekranu");
+      }
+
+      const blob = await new Promise((resolve, reject) => {
+        if (!canvas.toBlob) {
+          try {
+            const url = canvas.toDataURL("image/png", 1);
+            if (!url || url === "data:,") {
+              reject(new Error("Pusty zrzut ekranu"));
+              return;
+            }
+            resolve(url);
+          } catch (err) {
+            reject(err);
+          }
+          return;
+        }
+        canvas.toBlob(
+          (result) => {
+            if (!result) {
+              reject(new Error("Nie udało się utworzyć obrazu"));
+              return;
+            }
+            resolve(result);
+          },
+          "image/png",
+          1
+        );
+      });
+
+      const objectUrl =
+        typeof blob === "string" ? blob : URL.createObjectURL(blob);
+
+      const printHtml = `<!DOCTYPE html>
+<html lang="pl">
   <head>
     <meta charSet="utf-8" />
     <title>Drukuj skład</title>
@@ -249,9 +314,13 @@ export default function PrintModule({ lines = [], onBack }) {
         size: A4 portrait;
         margin: 0;
       }
+      * {
+        box-sizing: border-box;
+      }
       html, body {
         margin: 0;
         padding: 0;
+        width: 100%;
         height: 100%;
         background: #10131a;
       }
@@ -260,66 +329,123 @@ export default function PrintModule({ lines = [], onBack }) {
         align-items: center;
         justify-content: center;
       }
+      .sheet {
+        width: 210mm;
+        height: 297mm;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
       img {
-        width: 100%;
+        width: 210mm;
         height: auto;
+        max-height: 297mm;
         display: block;
       }
-      .wrapper {
-        width: 100vw;
-        height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #10131a;
-      }
-      .page {
-        width: min(100%, 210mm);
-        height: auto;
-        background: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      @media print {
+        body {
+          background: #ffffff;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="wrapper">
-      <div class="page">
-        <img id="print-image" src="${dataUrl}" alt="Podgląd prawej strony" />
-      </div>
+    <div class="sheet">
+      <img id="print-image" src="${objectUrl}" alt="Podgląd prawej strony" />
     </div>
     <script>
       (function() {
-        const img = document.getElementById('print-image');
+        const finish = () => {
+          window.removeEventListener('message', handleParentMessage);
+          try {
+            parent.postMessage({ type: 'print-module-right-page-finished' }, '*');
+          } catch (_) {}
+        };
 
         function triggerPrint() {
-          setTimeout(function() {
-            window.focus();
-            window.print();
-          }, 100);
+          window.focus();
+          window.print();
         }
+
+        function handleParentMessage(event) {
+          if (!event || !event.data) {
+            return;
+          }
+          if (event.data.type === 'print-module-right-page-abort') {
+            finish();
+          }
+        }
+
+        window.addEventListener('message', handleParentMessage);
+
+        const img = document.getElementById('print-image');
+        const startPrint = () => {
+          setTimeout(triggerPrint, 50);
+        };
 
         if (img.complete) {
-          triggerPrint();
+          startPrint();
         } else {
-          img.addEventListener('load', triggerPrint);
-          img.addEventListener('error', triggerPrint);
+          img.addEventListener('load', startPrint, { once: true });
+          img.addEventListener('error', startPrint, { once: true });
         }
 
-        window.addEventListener('afterprint', function() {
-          window.close();
+        window.addEventListener('afterprint', () => {
+          finish();
         });
       })();
     </scr` + `ipt>
   </body>
 </html>`;
 
-      printWindow.document.open();
-      printWindow.document.write(documentHtml);
-      printWindow.document.close();
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+      iframe.setAttribute("aria-hidden", "true");
+
+      const cleanup = () => {
+        if (cleanupPrintIframeRef.current === cleanup) {
+          cleanupPrintIframeRef.current = null;
+        }
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+        if (typeof blob !== "string") {
+          URL.revokeObjectURL(objectUrl);
+        }
+        window.removeEventListener("message", handleMessage);
+      };
+
+      const handleMessage = (event) => {
+        if (!event || !event.source || event.source !== iframe.contentWindow) {
+          return;
+        }
+        if (!event.data) {
+          return;
+        }
+        if (event.data.type === "print-module-right-page-finished") {
+          cleanup();
+        }
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      cleanupPrintIframeRef.current = cleanup;
+      document.body.appendChild(iframe);
+      iframe.srcdoc = printHtml;
     } catch (error) {
       console.error("[PrintModule] Nie udało się przygotować wydruku:", error);
+      if (cleanupPrintIframeRef.current) {
+        cleanupPrintIframeRef.current();
+        cleanupPrintIframeRef.current = null;
+      }
     }
   }, [loadHtml2Canvas]);
 
