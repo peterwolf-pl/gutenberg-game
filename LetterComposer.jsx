@@ -28,6 +28,47 @@ export default function LetterComposer({ onMoveLineToPage, onBack, kasztaImage =
   const [wierszownikDims, setWierszownikDims] = useState({ width: 1, height: 1 });
   const [isHelperVisible, setIsHelperVisible] = useState(false);
 
+  const handlePrintHelper = () => {
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) {
+      console.warn("[LetterComposer] Nie udało się otworzyć okna drukowania.");
+      return;
+    }
+
+    const helperSrc = "/assets/helper.png";
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charSet="utf-8" />
+    <title>Drukuj podpowiedź</title>
+    <style>
+      @page { size: A4; margin: 0; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body { display: flex; align-items: center; justify-content: center; background: #fff; }
+      img { width: 100%; height: 100%; object-fit: contain; }
+    </style>
+  </head>
+  <body>
+    <img src="${helperSrc}" alt="Podpowiedź" id="helper-image" />
+    <script>
+      function printAndClose() {
+        setTimeout(function() { window.focus(); window.print(); }, 150);
+      }
+      const img = document.getElementById('helper-image');
+      if (img.complete) {
+        printAndClose();
+      } else {
+        img.addEventListener('load', printAndClose);
+      }
+      window.addEventListener('afterprint', function() { window.close(); });
+    </scr` + `ipt>
+  </body>
+</html>`);
+
+    printWindow.document.close();
+  };
+
   useEffect(() => {
     const img = new window.Image();
     img.onload = () => setWierszownikDims({ width: img.width, height: img.height });
@@ -446,6 +487,29 @@ export default function LetterComposer({ onMoveLineToPage, onBack, kasztaImage =
             gap: 10,
           }}
         >
+          <button
+            onClick={handlePrintHelper}
+            style={{
+              background: "#222",
+              color: "#fff",
+              border: "2px solid #888",
+              borderRadius: "10%",
+              width: 39,
+              height: 39,
+              fontSize: 20,
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "2px 2px 8px #0002",
+              outline: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title="Drukuj podpowiedź"
+            aria-label="Drukuj podpowiedź"
+          >
+            🖨️
+          </button>
           <button
             onClick={() => setIsHelperVisible(true)}
             style={{
