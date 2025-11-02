@@ -5,6 +5,7 @@ const A4_WIDTH = 796;
 const A4_HEIGHT = 1123;
 const BASE_LETTER_HEIGHT = 96;
 const LETTER_SCALE = 0.3;
+const PX_TO_MM = 0.2645833333;
 
 const getLineHeight = (line) => {
   if (!line || line.length === 0) return BASE_LETTER_HEIGHT;
@@ -29,6 +30,13 @@ const normalizeWord = (word) =>
     .replace(/[^a-z0-9]/g, "");
 
 const reverseString = (value = "") => value.split("").reverse().join("");
+
+const escapeHtmlAttr = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 const easterEggMap = easterEggs.reduce((map, egg) => {
   const normalizedWord = normalizeWord(egg.word);
@@ -153,6 +161,147 @@ export default function PrintModule({ lines = [], onBack }) {
       }),
     [safeLines]
   );
+
+  const handlePrintRightPage = () => {
+    const printWindow = window.open("", "_blank", "width=900,height=650");
+    if (!printWindow) {
+      console.warn("[PrintModule] Nie udało się otworzyć okna drukowania.");
+      return;
+    }
+
+    const linesMarkup = printLines
+      .map((line) => {
+        if (!Array.isArray(line) || line.length === 0) {
+          return '<div class="line line--empty"></div>';
+        }
+
+        const lettersMarkup = line
+          .map((letter) => {
+            if (!letter) {
+              return "";
+            }
+
+            const widthPx =
+              typeof letter.width === "number" ? letter.width : BASE_LETTER_HEIGHT;
+            const heightPx =
+              typeof letter.height === "number" ? letter.height : BASE_LETTER_HEIGHT;
+            const widthMm = (widthPx * LETTER_SCALE * PX_TO_MM).toFixed(4);
+            const heightMm = (heightPx * LETTER_SCALE * PX_TO_MM).toFixed(4);
+            const imgSrc = letter.printImg || letter.img || "";
+            const alt = escapeHtmlAttr(letter.char || "");
+
+            return `
+              <img
+                src="${imgSrc}"
+                alt="${alt}"
+                style="width:${widthMm}mm;height:${heightMm}mm;object-fit:contain;display:block;"
+              />
+            `;
+          })
+          .join("");
+
+        return `<div class="line">${lettersMarkup}</div>`;
+      })
+      .join("");
+
+    const documentHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charSet="utf-8" />
+    <title>Drukuj skład</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #fff;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: sans-serif;
+      }
+      .page {
+        width: 210mm;
+        height: 297mm;
+        box-sizing: border-box;
+        padding: 15mm 18mm 18mm 18mm;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 4mm;
+        background: #fff;
+      }
+      .line {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 0;
+      }
+      .line--empty {
+        min-height: 6mm;
+        width: 100%;
+      }
+      img {
+        image-rendering: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      ${linesMarkup}
+    </div>
+    <script>
+      (function() {
+        function triggerPrint() {
+          setTimeout(function() {
+            window.focus();
+            window.print();
+          }, 150);
+        }
+
+        const images = Array.from(document.images);
+        if (images.length === 0) {
+          triggerPrint();
+          return;
+        }
+
+        let loaded = 0;
+        function tryFinish() {
+          loaded += 1;
+          if (loaded >= images.length) {
+            triggerPrint();
+          }
+        }
+
+        images.forEach(function(img) {
+          if (img.complete) {
+            tryFinish();
+          } else {
+            img.addEventListener('load', tryFinish);
+            img.addEventListener('error', tryFinish);
+          }
+        });
+
+        window.addEventListener('afterprint', function() {
+          window.close();
+        });
+      })();
+    </scr` + `ipt>
+  </body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(documentHtml);
+    printWindow.document.close();
+  };
 
   return (
     <div
@@ -358,8 +507,32 @@ export default function PrintModule({ lines = [], onBack }) {
             zIndex: 10,
             display: "flex",
             flexDirection: "column",
+            gap: 10,
           }}
         >
+          <button
+            onClick={handlePrintRightPage}
+            style={{
+              background: "#222",
+              color: "#fff",
+              border: "2px solid #888",
+              borderRadius: "10%",
+              width: 39,
+              height: 39,
+              fontSize: 20,
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "2px 2px 8px #0002",
+              outline: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title="Drukuj prawą stronę"
+            aria-label="Drukuj prawą stronę"
+          >
+            🖨️
+          </button>
           <button
             onClick={onBack}
             style={{
@@ -381,15 +554,15 @@ export default function PrintModule({ lines = [], onBack }) {
             title="Powrót"
             aria-label="Powrót"
           >
-          <span
-            style={{
-              display: "inline-block",
-              transform: "rotate(180deg) translateY(2px)",
-              fontFamily: "Arial, sans-serif",
-            }}
-          >
-            &#8594;
-          </span>
+            <span
+              style={{
+                display: "inline-block",
+                transform: "rotate(180deg) translateY(2px)",
+                fontFamily: "Arial, sans-serif",
+              }}
+            >
+              &#8594;
+            </span>
           </button>
         </div>
       </div>
