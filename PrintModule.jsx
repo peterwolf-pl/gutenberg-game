@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import easterEggs from "./printEasterEggs";
 
 const A4_WIDTH = 796;
 const A4_HEIGHT = 1123;
 const BASE_LETTER_HEIGHT = 96;
 const LETTER_SCALE = 0.3;
-const PX_TO_MM = 0.2645833333;
 
 const getLineHeight = (line) => {
   if (!line || line.length === 0) return BASE_LETTER_HEIGHT;
@@ -30,13 +29,6 @@ const normalizeWord = (word) =>
     .replace(/[^a-z0-9]/g, "");
 
 const reverseString = (value = "") => value.split("").reverse().join("");
-
-const escapeHtmlAttr = (value = "") =>
-  String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 
 const easterEggMap = easterEggs.reduce((map, egg) => {
   const normalizedWord = normalizeWord(egg.word);
@@ -77,6 +69,60 @@ export default function PrintModule({ lines = [], onBack }) {
   const [activeEgg, setActiveEgg] = useState(null);
   const triggeredEggsRef = useRef(new Set());
   const rightPageRef = useRef(null);
+  const html2CanvasLoaderRef = useRef(null);
+
+  const loadHtml2Canvas = useCallback(() => {
+    if (typeof window === "undefined") {
+      return Promise.resolve(null);
+    }
+
+    if (window.html2canvas) {
+      return Promise.resolve(window.html2canvas);
+    }
+
+    if (!html2CanvasLoaderRef.current) {
+      html2CanvasLoaderRef.current = new Promise((resolve, reject) => {
+        const scriptId = "html2canvas-script";
+        let script = document.getElementById(scriptId);
+
+        const cleanup = () => {
+          if (!script) {
+            return;
+          }
+          script.removeEventListener("load", handleLoad);
+          script.removeEventListener("error", handleError);
+        };
+
+        const handleLoad = () => {
+          cleanup();
+          resolve(window.html2canvas);
+        };
+
+        const handleError = (event) => {
+          cleanup();
+          html2CanvasLoaderRef.current = null;
+          reject(event?.error || new Error("Nie udało się wczytać html2canvas"));
+        };
+
+        if (!script) {
+          script = document.createElement("script");
+          script.id = scriptId;
+          script.src =
+            "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+          script.async = true;
+          script.crossOrigin = "anonymous";
+          script.addEventListener("load", handleLoad);
+          script.addEventListener("error", handleError);
+          document.head.appendChild(script);
+        } else {
+          script.addEventListener("load", handleLoad);
+          script.addEventListener("error", handleError);
+        }
+      });
+    }
+
+    return html2CanvasLoaderRef.current;
+  }, []);
 
   const safeLines = useMemo(
     () => (Array.isArray(lines) ? lines : []),
@@ -163,71 +209,37 @@ export default function PrintModule({ lines = [], onBack }) {
     [safeLines]
   );
 
-  const handlePrintRightPage = () => {
-    const toMm = (px) => (px * PX_TO_MM).toFixed(4);
-    const paddingTopMm = toMm(80);
-    const paddingLeftMm = toMm(60);
-    const marginBottomMm = toMm(12);
-
+  const handlePrintRightPage = useCallback(async () => {
     const rightPageEl = rightPageRef.current;
-    const renderedWidthPx = rightPageEl?.getBoundingClientRect().width || pageW;
-    const baseWidthPx = scale > 0 ? renderedWidthPx / scale : A4_WIDTH;
-    const baseHeightPx = A4_HEIGHT;
-    const pageWidthMm = toMm(baseWidthPx);
-    const pageHeightMm = toMm(baseHeightPx);
 
-    const printWindow = window.open("", "_blank", "width=900,height=650");
-    if (!printWindow) {
-      console.warn("[PrintModule] Nie udało się otworzyć okna drukowania.");
+    if (!rightPageEl) {
+      console.warn("[PrintModule] Nie znaleziono prawej strony do wydruku.");
       return;
     }
 
-    const linesMarkup = printLines
-      .map((line) => {
-        if (!Array.isArray(line) || line.length === 0) {
-          const emptyHeightMm = toMm(BASE_LETTER_HEIGHT);
-          return `<div class="line line--empty" style="min-height:${emptyHeightMm}mm"></div>`;
-        }
+    try {
+      const html2canvas = await loadHtml2Canvas();
 
-        const lettersMarkup = line
-          .map((letter) => {
-            if (!letter) {
-              return "";
-            }
+      if (!html2canvas) {
+        throw new Error("Brak biblioteki html2canvas");
+      }
 
-            const widthPx =
-              typeof letter.width === "number" ? letter.width : BASE_LETTER_HEIGHT;
-            const heightPx =
-              typeof letter.height === "number" ? letter.height : BASE_LETTER_HEIGHT;
-            const widthMm = toMm(widthPx * LETTER_SCALE);
-            const heightMm = toMm(heightPx * LETTER_SCALE);
-            const imgSrc = letter.printImg || letter.img || "";
-            const alt = escapeHtmlAttr(letter.char || "");
+      const canvas = await html2canvas(rightPageEl, {
+        backgroundColor: "#ffffff",
+        scale: window.devicePixelRatio || 1,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+      });
 
-            return `
-              <img
-                src="${imgSrc}"
-                alt="${alt}"
-                style="width:${widthMm}mm;height:${heightMm}mm;object-fit:contain;display:block;"
-              />
-            `;
-          })
-          .join("");
+      const dataUrl = canvas.toDataURL("image/png");
 
-        const lineHeightMm = toMm(getLineHeight(line));
+      const printWindow = window.open("", "_blank", "width=900,height=650");
+      if (!printWindow) {
+        throw new Error("Nie udało się otworzyć okna drukowania");
+      }
 
-        return `
-          <div
-            class="line"
-            style="min-height:${lineHeightMm}mm;margin:0 0 ${marginBottomMm}mm 0;"
-          >
-            ${lettersMarkup}
-          </div>
-        `;
-      })
-      .join("");
-
-    const documentHtml = `<!DOCTYPE html>
+      const documentHtml = `<!DOCTYPE html>
 <html>
   <head>
     <meta charSet="utf-8" />
@@ -247,86 +259,53 @@ export default function PrintModule({ lines = [], onBack }) {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: sans-serif;
       }
-      .page-wrapper {
-        width: ${pageWidthMm}mm;
-        height: ${pageHeightMm}mm;
+      img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .wrapper {
+        width: 100vw;
+        height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: transparent;
+        background: #10131a;
       }
       .page {
-        width: ${pageWidthMm}mm;
-        height: ${pageHeightMm}mm;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: flex-start;
-        padding-top: ${paddingTopMm}mm;
-        padding-left: ${paddingLeftMm}mm;
+        width: min(100%, 210mm);
+        height: auto;
         background: #fff;
-        box-shadow: 0 6px 48px #0003;
-        overflow: hidden;
-      }
-      .line {
         display: flex;
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: flex-start;
-        gap: 0;
-        transform: scaleX(-1);
-        transform-origin: top left;
-      }
-      .line--empty {
-        width: 100%;
-      }
-      img {
-        image-rendering: auto;
-        display: block;
-        transform-origin: center;
+        align-items: center;
+        justify-content: center;
       }
     </style>
   </head>
   <body>
-    <div class="page-wrapper">
+    <div class="wrapper">
       <div class="page">
-        ${linesMarkup}
+        <img id="print-image" src="${dataUrl}" alt="Podgląd prawej strony" />
       </div>
     </div>
     <script>
       (function() {
+        const img = document.getElementById('print-image');
+
         function triggerPrint() {
           setTimeout(function() {
             window.focus();
             window.print();
-          }, 150);
+          }, 100);
         }
 
-        const images = Array.from(document.images);
-        if (images.length === 0) {
+        if (img.complete) {
           triggerPrint();
-          return;
+        } else {
+          img.addEventListener('load', triggerPrint);
+          img.addEventListener('error', triggerPrint);
         }
-
-        let loaded = 0;
-        function tryFinish() {
-          loaded += 1;
-          if (loaded >= images.length) {
-            triggerPrint();
-          }
-        }
-
-        images.forEach(function(img) {
-          if (img.complete) {
-            tryFinish();
-          } else {
-            img.addEventListener('load', tryFinish);
-            img.addEventListener('error', tryFinish);
-          }
-        });
 
         window.addEventListener('afterprint', function() {
           window.close();
@@ -336,10 +315,13 @@ export default function PrintModule({ lines = [], onBack }) {
   </body>
 </html>`;
 
-    printWindow.document.open();
-    printWindow.document.write(documentHtml);
-    printWindow.document.close();
-  };
+      printWindow.document.open();
+      printWindow.document.write(documentHtml);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("[PrintModule] Nie udało się przygotować wydruku:", error);
+    }
+  }, [loadHtml2Canvas]);
 
   return (
     <div
