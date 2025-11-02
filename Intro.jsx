@@ -11,7 +11,7 @@ export default function Intro({ onSelect, onAdmin }) {
   }
 
   return (
-    <div style={{ textAlign: "center", padding: "100px", position: "relative" }}>
+    <div style={{ textAlign: "center", padding: "220px", position: "relative" }}>
       <button
         onClick={handleAdminClick}
         style={{
@@ -19,20 +19,22 @@ export default function Intro({ onSelect, onAdmin }) {
           top: 10,
           right: 10,
           background: "transparent",
-          border: "none",
+          border: "1px",
           color: "#fff",
           cursor: "pointer",
           fontSize: "16px",
         }}
       >
-        p
+        A
       </button>
+     
       <h1
         style={{
+          marginTop: "-200px",
           fontFamily: "GrohmanGrotesk-Classic",
-          fontSize: "223px",
+          fontSize: "200px",
           color: "#FFF",
-          height: "100px",
+          height: "70px",
         }}
       >
         ZECER
@@ -40,39 +42,50 @@ export default function Intro({ onSelect, onAdmin }) {
       <h2
         style={{
           fontFamily: "GrohmanGrotesk-Classic",
-          fontSize: "2.66rem",
+          fontSize: "2.86rem",
           color: "#ff0000",
         }}
       >MUZEUM KSIĄŻKI ARTYSTYCZNEJ</h2>
       <h3
         style={{
           fontFamily: "GrohmanGrotesk-Classic",
-          fontSize: "1rem",
-          color: "#000",
+          fontSize: "1.8rem",
+          color: "#000000c2",
+         //background: "#00000096",
+         marginTop: "-20px",
         }}
-      >WYBIERZ SWOJĄ KASZTĘ:</h3>
+      >WYBIERZ KASZTĘ:</h3>
       <div
         style={{
           display: "flex",
           justifyContent: "center",
-          gap: "0.1rem",
-          marginTop: "0.1rem",
+          gap: "0rem",
+          marginTop: "0rem",
+           
         }}
       >
-        <img
-          src="/assets/kaszta.png"
-          alt="Kaszta"
-          style={{ width: "400px", cursor: "pointer" }}
-          onClick={() => onSelect("kaszta")}
-        />
+      
         <img
           src="/assets/kaszta_szuflada.png"
           alt="Kaszta szuflada"
           style={{ width: "400px", cursor: "pointer" }}
           onClick={() => onSelect("szuflada")}
         />
-      </div>
+     
+     </div> 
+    <h4
+        style={{
+          fontFamily: "GrohmanGrotesk-Classic",
+          fontSize: "1.17rem",
+          color: "#999",
+          marginTop: "0rem",
+           background: "#000000ea",
+        }}
+      >Czcionka Brygada 1918</h4>
+        
     </div>
+ 
+   
   );
 }
 

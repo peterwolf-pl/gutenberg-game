@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import easterEggs from "./printEasterEggs";
 
 const A4_WIDTH = 796;
 const A4_HEIGHT = 1123;
@@ -12,9 +13,66 @@ const getLineHeight = (line) => {
   );
 };
 
-export default function PrintModule({ lines, onBack }) {
+const getPrintLetterImage = (letter) => {
+  if (!letter || !letter.img) return null;
+  const fileName = letter.img.split("/").filter(Boolean).pop();
+  if (!fileName) return null;
+  return `/assets/letters/print/${fileName}`;
+};
+
+const normalizeWord = (word) =>
+  (word || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
+const reverseString = (value = "") => value.split("").reverse().join("");
+
+const easterEggMap = easterEggs.reduce((map, egg) => {
+  const normalizedWord = normalizeWord(egg.word);
+  const key = reverseString(normalizedWord);
+  if (key && !map.has(key)) {
+    map.set(key, egg);
+  }
+  return map;
+}, new Map());
+
+const getYoutubeEmbedUrl = (src) => {
+  if (!src) return null;
+  try {
+    const url = new URL(src);
+    if (url.hostname.includes("youtube.com")) {
+      if (url.pathname === "/watch") {
+        const id = url.searchParams.get("v");
+        return id ? `https://www.youtube.com/embed/${id}?autoplay=1` : null;
+      }
+      if (url.pathname.startsWith("/embed/")) {
+        return `${url.origin}${url.pathname}?autoplay=1`;
+      }
+    }
+    if (url.hostname === "youtu.be") {
+      const id = url.pathname.replace("/", "");
+      return id ? `https://www.youtube.com/embed/${id}?autoplay=1` : null;
+    }
+  } catch (err) {
+    return null;
+  }
+  return null;
+};
+
+export default function PrintModule({ lines = [], onBack }) {
   const [pageW, setPageW] = useState(A4_WIDTH);
   const [animReady, setAnimReady] = useState(false);
+  const [rightPageShown, setRightPageShown] = useState(false);
+  const [activeEgg, setActiveEgg] = useState(null);
+  const triggeredEggsRef = useRef(new Set());
+
+  const safeLines = useMemo(
+    () => (Array.isArray(lines) ? lines : []),
+    [lines]
+  );
 
   // Dynamiczne skalowanie dwóch kartek w oknie
   useEffect(() => {
@@ -48,8 +106,53 @@ export default function PrintModule({ lines, onBack }) {
     return () => clearTimeout(t);
   }, []);
 
-  // Lustrzane odbicie: linie od dołu, każda linia od końca i flipped poziomo
-  const mirroredLines = [...lines];
+  useEffect(() => {
+    if (!animReady) {
+      setRightPageShown(false);
+      return undefined;
+    }
+    const t = setTimeout(() => setRightPageShown(true), 1000);
+    return () => clearTimeout(t);
+  }, [animReady]);
+
+  useEffect(() => {
+    if (!rightPageShown) {
+      return;
+    }
+
+    const triggered = triggeredEggsRef.current;
+    for (const line of safeLines) {
+      if (!Array.isArray(line) || line.length === 0) {
+        continue;
+      }
+      const rawWord = line.map((l) => (l && l.char ? l.char : "")).join("");
+      const normalized = normalizeWord(rawWord);
+      if (!normalized || triggered.has(normalized)) {
+        continue;
+      }
+
+      const egg = easterEggMap.get(normalized);
+      if (egg) {
+        triggered.add(normalized);
+        setActiveEgg({ ...egg, rawWord });
+        break;
+      }
+    }
+  }, [rightPageShown, safeLines]);
+
+  const printLines = useMemo(
+    () =>
+      safeLines.map((line) => {
+        if (!Array.isArray(line)) {
+          return [];
+        }
+        return line.map((letter) => ({
+          ...letter,
+          printImg: getPrintLetterImage(letter) || letter.img,
+        }));
+      }),
+    [safeLines]
+  );
 
   return (
     <div
@@ -136,7 +239,7 @@ export default function PrintModule({ lines, onBack }) {
                 zIndex: 2
               }}
             />
-            {lines.map((line, i) => {
+            {safeLines.map((line, i) => {
               const lineHeight = getLineHeight(line);
               return (
                 <div
@@ -210,7 +313,7 @@ export default function PrintModule({ lines, onBack }) {
                 paddingLeft: 60 * scale
               }}
             >
-              {mirroredLines.map((line, i) => {
+              {printLines.map((line, i) => {
                 const lineHeight = getLineHeight(line);
                 return (
                   <div
@@ -223,14 +326,13 @@ export default function PrintModule({ lines, onBack }) {
                       justifyContent: "flex-start",
                       margin: `${0 * scale}px 0 ${12 * scale}px 0`,
                       minHeight: lineHeight * scale,
-                      filter: "invert(1)",
                       maxWidth: "100%"
                     }}
                   >
                     {[...line].map((letter, j) => (
                       <img
                         key={j}
-                        src={letter.img}
+                        src={letter.printImg}
                         alt={letter.char}
                         width={letter.width * LETTER_SCALE * scale}
                         height={
@@ -343,6 +445,106 @@ export default function PrintModule({ lines, onBack }) {
           peterwolf.pl
         </a>
       </p>
+      {activeEgg && (
+        <div
+          style={{
+            position: "fixed",
+            right: 32,
+            bottom: 32,
+            maxWidth: 360,
+            background: "#111d",
+            backdropFilter: "blur(6px)",
+            color: "#fff",
+            borderRadius: 16,
+            boxShadow: "0 12px 48px #0009",
+            padding: 20,
+            zIndex: 1000,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <strong style={{ fontSize: 16 }}>
+              Easter egg: {activeEgg.word || activeEgg.rawWord}
+            </strong>
+            <button
+              onClick={() => setActiveEgg(null)}
+              style={{
+                background: "transparent",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+                padding: 4,
+              }}
+              aria-label="Zamknij easter egga"
+            >
+              ×
+            </button>
+          </div>
+          {activeEgg.description && (
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.4 }}>
+              {activeEgg.description}
+            </p>
+          )}
+          <div
+            style={{
+              width: "100%",
+              borderRadius: 12,
+              overflow: "hidden",
+              background: "#000",
+            }}
+          >
+            {activeEgg.type === "image" && (
+              <img
+                src={activeEgg.src}
+                alt={activeEgg.description || activeEgg.word}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                }}
+              />
+            )}
+            {activeEgg.type === "audio" && (
+              <audio
+                src={activeEgg.src}
+                controls
+                autoPlay
+                style={{ width: "100%" }}
+              />
+            )}
+            {activeEgg.type === "video" && (
+              <video
+                src={activeEgg.src}
+                controls
+                autoPlay
+                style={{ width: "100%" }}
+              />
+            )}
+            {activeEgg.type === "youtube" && (
+              <iframe
+                src={getYoutubeEmbedUrl(activeEgg.src) || activeEgg.src}
+                title={activeEgg.description || activeEgg.word}
+                width="100%"
+                height="200"
+                style={{ border: "none", width: "100%" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
