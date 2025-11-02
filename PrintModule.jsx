@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const A4_WIDTH = 796;
 const A4_HEIGHT = 1123;
@@ -12,9 +12,21 @@ const getLineHeight = (line) => {
   );
 };
 
-export default function PrintModule({ lines, onBack }) {
+const getPrintLetterImage = (letter) => {
+  if (!letter || !letter.img) return null;
+  const fileName = letter.img.split("/").filter(Boolean).pop();
+  if (!fileName) return null;
+  return `/assets/letters/print/${fileName}`;
+};
+
+export default function PrintModule({ lines = [], onBack }) {
   const [pageW, setPageW] = useState(A4_WIDTH);
   const [animReady, setAnimReady] = useState(false);
+
+  const safeLines = useMemo(
+    () => (Array.isArray(lines) ? lines : []),
+    [lines]
+  );
 
   // Dynamiczne skalowanie dwóch kartek w oknie
   useEffect(() => {
@@ -48,8 +60,19 @@ export default function PrintModule({ lines, onBack }) {
     return () => clearTimeout(t);
   }, []);
 
-  // Lustrzane odbicie: linie od dołu, każda linia od końca i flipped poziomo
-  const mirroredLines = [...lines];
+  const printLines = useMemo(
+    () =>
+      safeLines.map((line) => {
+        if (!Array.isArray(line)) {
+          return [];
+        }
+        return line.map((letter) => ({
+          ...letter,
+          printImg: getPrintLetterImage(letter) || letter.img,
+        }));
+      }),
+    [safeLines]
+  );
 
   return (
     <div
@@ -136,7 +159,7 @@ export default function PrintModule({ lines, onBack }) {
                 zIndex: 2
               }}
             />
-            {lines.map((line, i) => {
+            {safeLines.map((line, i) => {
               const lineHeight = getLineHeight(line);
               return (
                 <div
@@ -210,7 +233,7 @@ export default function PrintModule({ lines, onBack }) {
                 paddingLeft: 60 * scale
               }}
             >
-              {mirroredLines.map((line, i) => {
+              {printLines.map((line, i) => {
                 const lineHeight = getLineHeight(line);
                 return (
                   <div
@@ -223,14 +246,13 @@ export default function PrintModule({ lines, onBack }) {
                       justifyContent: "flex-start",
                       margin: `${0 * scale}px 0 ${12 * scale}px 0`,
                       minHeight: lineHeight * scale,
-                      filter: "invert(1)",
                       maxWidth: "100%"
                     }}
                   >
                     {[...line].map((letter, j) => (
                       <img
                         key={j}
-                        src={letter.img}
+                        src={letter.printImg}
                         alt={letter.char}
                         width={letter.width * LETTER_SCALE * scale}
                         height={
