@@ -303,6 +303,18 @@ export default function LetterFieldEditor({
   }
 
   const hasWindow = typeof window !== "undefined";
+  const resolvedPozHref = useMemo(() => {
+    const base = hasWindow ? window.location.href : "http://localhost";
+    try {
+      return new URL(pozSrc, base).href;
+    } catch {
+      return pozSrc;
+    }
+  }, [pozSrc, hasWindow]);
+
+  useEffect(() => {
+    console.info(`[LetterFieldEditor] Aktywny plik pozycji: ${resolvedPozHref}`);
+  }, [resolvedPozHref]);
 
   function getFilenameFromPath(path) {
     if (!path) return "pozycje.json";
@@ -365,6 +377,8 @@ export default function LetterFieldEditor({
     const json = JSON.stringify(fields, null, 2);
     const fallbackName = getFilenameFromPath(pozSrc);
 
+    console.info(`[LetterFieldEditor] Próba zapisu do ${resolvedPozHref}`);
+
     try {
       const response = await fetch(pozSrc, {
         method: "PUT",
@@ -380,6 +394,7 @@ export default function LetterFieldEditor({
         throw error;
       }
 
+      console.info(`[LetterFieldEditor] Zapis zakończył się powodzeniem dla ${resolvedPozHref}`);
       setSaveStatus({ type: "success", message: "Zmiany zapisane pomyślnie." });
     } catch (err) {
       if (err?.status === 501 || err?.status === 405) {
@@ -389,14 +404,18 @@ export default function LetterFieldEditor({
             setSaveStatus({
               type: "info",
               message:
-                "Serwer nie wspiera zapisu. Plik został zapisany lokalnie – zamień nim oryginalny JSON.",
+                "Serwer nie wspiera zapisu pod " +
+                resolvedPozHref +
+                ". Plik został zapisany lokalnie – zamień nim oryginalny JSON.",
             });
           } else if (hasWindow) {
             downloadJson(json, fallbackName);
             setSaveStatus({
               type: "info",
               message:
-                "Serwer nie wspiera zapisu. Pobrano plik JSON – podmień nim oryginalny plik.",
+                "Serwer nie wspiera zapisu pod " +
+                resolvedPozHref +
+                ". Pobrano plik JSON – podmień nim oryginalny plik.",
             });
           } else {
             throw new Error(
@@ -411,7 +430,10 @@ export default function LetterFieldEditor({
         }
       } else {
         const message = err?.message || "Nie udało się zapisać pliku.";
-        setSaveStatus({ type: "error", message });
+        setSaveStatus({
+          type: "error",
+          message: message + " (cel: " + resolvedPozHref + ")",
+        });
       }
     } finally {
       setIsSaving(false);
@@ -426,6 +448,10 @@ export default function LetterFieldEditor({
       <p style={{ marginBottom: 16, color: "#475569" }}>
         Wczytano pozycje z pliku <code>{pozSrc}</code>. Wybierz literę z listy,
         a następnie kliknij dwa narożniki na kaszcie, aby ustawić jej pole.
+        <br />
+        <span style={{ fontSize: 13, color: "#64748b" }}>
+          Pełny adres: <code>{resolvedPozHref}</code>
+        </span>
       </p>
 
       {loading && <div>Ładowanie pozycji…</div>}

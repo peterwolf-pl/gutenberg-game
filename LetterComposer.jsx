@@ -57,10 +57,30 @@ export default function LetterComposer({ onMoveLineToPage, onBack, kasztaImage =
   }, []);
 
   useEffect(() => {
+    const base = typeof window !== "undefined" ? window.location.href : "http://localhost";
+    let resolvedPoz = pozSrc;
+    try {
+      resolvedPoz = new URL(pozSrc, base).href;
+    } catch (urlError) {
+      console.warn("[LetterComposer] Nie udało się zbudować pełnej ścieżki do pliku pozycji:", urlError);
+    }
+
+    console.info(`[LetterComposer] Pobieranie pól liter z ${resolvedPoz}`);
+
     fetch(pozSrc)
-      .then(res => res.json())
-      .then(setLetterFields)
-      .catch(() => setLetterFields([]));
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Nie udało się pobrać pól (${res.status}) z ${resolvedPoz}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        setLetterFields(Array.isArray(data) ? data : []);
+      })
+      .catch(error => {
+        console.error("[LetterComposer] Błąd podczas pobierania pól:", error);
+        setLetterFields([]);
+      });
   }, [pozSrc]);
 
 
